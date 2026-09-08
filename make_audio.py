@@ -98,6 +98,7 @@
 # if __name__ == "__main__":
 #     main()
 
+
 """Two-voice WAV of a fixture sales call — using gTTS (Google Text-to-Speech).
 Works on Linux/Mac/Windows. Perfect for cloud hosting like Render or Railway.
 """
@@ -105,18 +106,20 @@ Works on Linux/Mac/Windows. Perfect for cloud hosting like Render or Railway.
 import os
 import re
 import sys
-import wave
-import array
 import tempfile
+
 from gtts import gTTS
 from pydub import AudioSegment
+import imageio_ffmpeg
+
+# Tell pydub to use the automatically downloaded ffmpeg executable
+AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 LINE_RE = re.compile(r"^\[(\d{2}:\d{2})\]\s+([A-Za-z][A-Za-z .'-]*):\s*(.+)$", re.M)
 
 # Google TTS voice codes
-# tld='com' is a standard male-ish voice, tld='co.uk' gives a different female-ish voice
 VOICE_A_TLD = "com"   # First speaker
 VOICE_B_TLD = "co.uk"  # Second speaker
 
@@ -152,7 +155,6 @@ def main():
     speaker_a, speaker_b = speakers[0], speakers[1]
     print(f"detected speakers: A={speaker_a!r}, B={speaker_b!r}")
 
-    # Slow down slightly for better clarity (optional)
     tld_for = {speaker_a: VOICE_A_TLD, speaker_b: VOICE_B_TLD}
 
     tmp = []
@@ -169,7 +171,6 @@ def main():
         if i % 10 == 0:
             print(f"synthesized {i + 1}/{len(lines)}", flush=True)
 
-    # Combine all MP3s into a single WAV file
     print("Combining audio files...")
     combined = AudioSegment.empty()
     gap = AudioSegment.silent(duration=400) # 0.4 second pause
