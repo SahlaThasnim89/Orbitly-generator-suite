@@ -67,24 +67,26 @@ def main():
         tts.save(path)
         return path
 
-    print(f"Synthesizing {len(lines)} lines in parallel (15 at a time)...")
+    print(f"Synthesizing {len(lines)} lines in parallel (30 at a time)...")
     tmp = []
-    # Process 15 lines simultaneously instead of 1 by 1
-    with ThreadPoolExecutor(max_workers=15) as executor:
+    # Increased from 15 to 30 workers for faster downloads
+    with ThreadPoolExecutor(max_workers=30) as executor:
         futures = [executor.submit(process_line, i, line) for i, line in enumerate(lines)]
         for future in futures:
             tmp.append(future.result())
 
     print("Combining audio files...")
-    combined = AudioSegment.empty()
+    # Optimized pydub stitching to use less CPU memory
+    combined = AudioSegment.silent(duration=0)
     gap = AudioSegment.silent(duration=400) # 0.4 second pause
 
     for p in tmp:
         audio = AudioSegment.from_mp3(p)
-        combined += audio + gap
+        combined = combined.append(audio, crossfade=0)
+        combined = combined.append(gap, crossfade=0)
         os.remove(p)
 
-    # Export as WAV (22kHz 16-bit Mono to match your original specs)
+    # Export as WAV (22kHz 16-bit Mono)
     combined = combined.set_frame_rate(22050).set_channels(1).set_sample_width(2)
     combined.export(OUT, format="wav")
     
