@@ -102,18 +102,27 @@
                         </div>
                         <div>
                             <h3 class="text-xl font-bold text-slate-900">Meeting Audio (WAV)</h3>
-                            <p class="text-sm text-slate-500">Two-voice transcription to speech</p>
+                            <p class="text-sm text-slate-500">Paste transcript or upload a file</p>
                         </div>
                     </div>
 
-                    <div id="audioDropzone" class="dropzone cursor-pointer border-2 border-dashed border-slate-300 rounded-xl p-8 text-center mb-6">
-                        <input type="file" id="audioFile" accept=".md,.txt" class="hidden">
-                        <svg class="w-10 h-10 text-slate-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <p class="text-sm font-medium text-slate-700"><span id="audioFileName">Drop transcript here</span> or <span class="text-teal-600">browse</span></p>
-                        <p class="text-xs text-slate-400 mt-1">Requires [hh:mm] Speaker: text format</p>
+                    <!-- Paste Text Box -->
+                    <textarea id="audioText" rows="4" class="w-full border-2 border-slate-300 rounded-xl p-4 text-sm mb-3 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition font-mono" placeholder="[00:00] Harry: Hello...&#10;[00:05] Sahla: Hi Harry..."></textarea>
+                    
+                    <!-- OR Divider -->
+                    <div class="flex items-center my-3">
+                        <div class="flex-grow border-t border-slate-200"></div>
+                        <span class="px-3 text-xs text-slate-400 font-semibold">OR</span>
+                        <div class="flex-grow border-t border-slate-200"></div>
                     </div>
 
-                    <button onclick="generate('audio', 'audioFile', 'audioStatus', 'audioBtn')" id="audioBtn" class="w-full bg-indigo-900 text-white font-semibold py-3 rounded-xl hover:bg-indigo-800 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <!-- File Upload Box -->
+                    <div id="audioDropzone" class="dropzone cursor-pointer border-2 border-dashed border-slate-300 rounded-xl p-4 text-center mb-6">
+                        <input type="file" id="audioFile" accept=".md,.txt" class="hidden">
+                        <p class="text-sm font-medium text-slate-700"><span id="audioFileName">Click to upload .md / .txt</span></p>
+                    </div>
+
+                    <button onclick="generateAudio()" id="audioBtn" class="w-full bg-indigo-900 text-white font-semibold py-3 rounded-xl hover:bg-indigo-800 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         Generate Audio
                     </button>
                     <div id="audioStatus" class="mt-4 text-sm text-center h-5"></div>
@@ -308,6 +317,78 @@
                 statusDiv.innerHTML = `<span class="text-red-500 font-medium">Error: ${error.message}</span>`;
             } finally {
                 // Reset button state
+                btn.disabled = false;
+                btn.innerHTML = originalBtnText;
+            }
+        }
+
+        // Smart function for Audio that accepts BOTH pasted text and uploaded files
+        async function generateAudio() {
+            const textArea = document.getElementById('audioText');
+            const fileInput = document.getElementById('audioFile');
+            const statusDiv = document.getElementById('audioStatus');
+            const btn = document.getElementById('audioBtn');
+            
+            let fileToSend = null;
+
+            // 1. Check if user pasted text
+            if (textArea.value.trim()) {
+                const blob = new Blob([textArea.value], { type: 'text/plain' });
+                fileToSend = new File([blob], "pasted_transcript.txt", { type: "text/plain" });
+            } 
+            // 2. If no text, check if user uploaded a file
+            else if (fileInput.files.length > 0) {
+                fileToSend = fileInput.files[0];
+            } 
+            // 3. If neither, show error
+            else {
+                statusDiv.innerHTML = '<span class="text-red-500 font-medium">Please paste text or upload a file.</span>';
+                return;
+            }
+
+            // Update UI to Loading State
+            const originalBtnText = btn.textContent;
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loader"></div> Generating...`;
+            statusDiv.innerHTML = '<span class="text-slate-500">Processing script...</span>';
+            
+            const formData = new FormData();
+            formData.append('file', fileToSend);
+
+            try {
+                const response = await fetch(`/generate/audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Generation failed');
+                }
+
+                const blobRes = await response.blob();
+                const url = window.URL.createObjectURL(blobRes);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                const contentDisposition = response.headers.get('content-disposition');
+                let fileName = `generated_audio.wav`;
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="(.+)"/);
+                    if (match) fileName = match[1];
+                }
+                
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                statusDiv.innerHTML = '<span class="text-teal-600 font-semibold flex items-center justify-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Success! Download started</span>';
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.innerHTML = `<span class="text-red-500 font-medium">Error: ${error.message}</span>`;
+            } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalBtnText;
             }
