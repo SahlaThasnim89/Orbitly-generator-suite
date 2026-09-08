@@ -9,10 +9,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from gtts import gTTS
 from pydub import AudioSegment
-import imageio_ffmpeg
-
-# Tell pydub to use the automatically downloaded ffmpeg executable
-AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
